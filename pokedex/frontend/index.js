@@ -1,14 +1,34 @@
 let pokemonData = [];
 
-// Fetch data from mock server
+// Fetch data from mock server and PokeAPI
 async function fetchPokemon() {
   try {
+    // Fetch Pokemon list from local server
     const response = await fetch("http://localhost:3000/pokemon");
     if (!response.ok) {
-      throw new Error("http call failed");
+      throw new Error("HTTP call to local server failed");
     }
-    const data = await response.json();
-    pokemonData = data;
+    const localPokemonList = await response.json();
+
+    // Fetch details for each Pokémon from PokeAPI
+    const fetches = localPokemonList.map(async (pokemon) => {
+      const apiResponse = await fetch(
+        `https://pokeapi.co/api/v2/pokemon/${pokemon.name}`
+      );
+      if (!apiResponse.ok) {
+        throw new Error(`Failed to fetch data for ${pokemon.name}`);
+      }
+      const pokeData = await apiResponse.json();
+      return {
+        id: pokeData.id,
+        name: pokeData.name,
+        types: pokeData.types.map((typeInfo) => typeInfo.type.name),
+        image: pokeData.sprites.front_default,
+      };
+    });
+
+    // Wait for all fetches to complete
+    pokemonData = await Promise.all(fetches);
     renderApp();
   } catch (error) {
     console.error("Failed to fetch Pokemon data:", error);
@@ -16,14 +36,22 @@ async function fetchPokemon() {
   }
 }
 
-// Card component
-function PokemonCard(props) {
+// Card component with destructuring
+function PokemonCard({ name, image, types }) {
   return React.createElement(
     "div",
-    { className: "" },
-    React.createElement("img", { src: props.image, alt: props.name }),
-    React.createElement("h2", null, props.name),
-    React.createElement("p", null, `Type: ${props.types}`)
+    { className: "m-4 p-4 border rounded shadow-lg text-center" },
+    React.createElement("img", {
+      src: image,
+      alt: name,
+      className: "w-32 h-32 mx-auto",
+    }),
+    React.createElement("h2", { className: "text-xl font-bold" }, name),
+    React.createElement(
+      "p",
+      { className: "text-gray-600" },
+      `Type: ${types ? types.join("/") : "Unknown"}`
+    )
   );
 }
 
@@ -44,25 +72,25 @@ function PokemonList() {
       React.createElement(PokemonCard, {
         key: pokemon.id,
         name: pokemon.name,
-        types: pokemon.types.join("/"),
-        image: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemon.id}.png`,
+        types: pokemon.types,
+        image: pokemon.image,
       })
     )
   );
 }
 
-// App component wrap header and list
+// App component wrapping header and list
 function App() {
   return React.createElement(
     "div",
-    { className: "" },
+    { className: "p-4" },
     React.createElement(
       "header",
-      { className: "" },
+      { className: "mb-4" },
       React.createElement(
         "h1",
         { className: "text-3xl text-center font-bold underline" },
-        "Pokedex"
+        "List Pokedex"
       )
     ),
     React.createElement(PokemonList, null)
